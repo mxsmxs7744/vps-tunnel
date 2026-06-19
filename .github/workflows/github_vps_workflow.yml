@@ -11,7 +11,7 @@ on:
 jobs:
   vps:
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.duration || 60 }}
+    timeout-minutes: 360
     
     steps:
       - name: Install SSH Server
