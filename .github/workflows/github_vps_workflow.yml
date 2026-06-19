@@ -52,16 +52,21 @@ jobs:
         run: |
           ngrok tcp 22 --log=stdout > /tmp/ngrok.log &
           NGROK_PID=$!
-          sleep 5
+          sleep 15
           cat /tmp/ngrok.log
           
       - name: Get Ngrok URL
         id: ngrok
         run: |
-          sleep 10
+          sleep 20
           NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | grep -o 'tcp://[^"]*' | head -1)
           echo "url=$NGROK_URL" >> $GITHUB_OUTPUT
           echo "Ngrok URL: $NGROK_URL"
+          if [ -z "$NGROK_URL" ]; then
+            echo "Failed to get ngrok URL"
+            cat /tmp/ngrok.log
+            exit 1
+          fi
           
       - name: Keep Alive
         run: |
