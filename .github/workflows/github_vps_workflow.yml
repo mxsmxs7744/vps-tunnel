@@ -42,36 +42,25 @@ jobs:
           echo "ip=$IP" >> $GITHUB_OUTPUT
           echo "Container IP: $IP"
           
-      - name: Install Ngrok
+      - name: Start SSH Tunnel via Serveo
+        id: tunnel
         run: |
-          wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-stable-linux-amd64.zip
-          unzip ngrok-stable-linux-amd64.zip
-          sudo mv ngrok /usr/local/bin/
-          
-      - name: Start Ngrok Tunnel
-        run: |
-          ngrok tcp 22 --log=stdout > /tmp/ngrok.log &
-          NGROK_PID=$!
-          sleep 15
-          cat /tmp/ngrok.log
-          
-      - name: Get Ngrok URL
-        id: ngrok
-        run: |
-          sleep 20
-          NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | grep -o 'tcp://[^"]*' | head -1)
-          echo "url=$NGROK_URL" >> $GITHUB_OUTPUT
-          echo "Ngrok URL: $NGROK_URL"
-          if [ -z "$NGROK_URL" ]; then
-            echo "Failed to get ngrok URL"
-            cat /tmp/ngrok.log
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -R vps-$(date +%s):22:0.0.0.0 serveo.net > /tmp/serveo.log 2>&1 &
+          TUNNEL_PID=$!
+          sleep 30
+          TUNNEL_HOST=$(grep -o 'Forwarding TCP connection from [^ ]*' /tmp/serveo.log | head -1 | awk '{print $5}')
+          echo "url=$TUNNEL_HOST" >> $GITHUB_OUTPUT
+          echo "Tunnel Host: $TUNNEL_HOST"
+          if [ -z "$TUNNEL_HOST" ]; then
+            echo "Failed to get tunnel host"
+            cat /tmp/serveo.log
             exit 1
           fi
           
       - name: Keep Alive
         run: |
-          echo "VPS is running. SSH available via ngrok."
-          echo "Ngrok URL: ${{ steps.ngrok.outputs.url }}"
+          echo "VPS is running. SSH available via serveo.net."
+          echo "Tunnel Host: ${{ steps.tunnel.outputs.url }}"
           echo "Username: vpsuser"
           echo "Password: vpspassword"
           echo "Duration: ${{ inputs.duration || 60 }} minutes"
