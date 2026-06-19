@@ -1,0 +1,73 @@
+name: Temporary VPS with SSH Server
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'Duration in minutes'
+        required: true
+        default: '60'
+
+jobs:
+  vps:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.duration || 60 }}
+    
+    steps:
+      - name: Install SSH Server
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openssh-server
+          sudo service ssh start
+          sudo useradd -m -s /bin/bash vpsuser
+          echo 'vpsuser:vpspassword' | sudo chpasswd
+          sudo usermod -aG sudo vpsuser
+          echo "vpsuser ALL=(ALL) NOPASSWD:ALL" | sudo tee -a /etc/sudoers
+          
+      - name: Install Additional Tools
+        run: |
+          sudo apt-get install -y curl wget python3 python3-pip
+          pip3 install requests
+          
+      - name: Setup SSH Config
+        run: |
+          sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+          sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          sudo service ssh restart
+          
+      - name: Get Container IP
+        id: ip
+        run: |
+          IP=$(hostname -I | awk '{print $1}')
+          echo "ip=$IP" >> $GITHUB_OUTPUT
+          echo "Container IP: $IP"
+          
+      - name: Install Ngrok
+        run: |
+          wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-stable-linux-amd64.zip
+          unzip ngrok-stable-linux-amd64.zip
+          sudo mv ngrok /usr/local/bin/
+          
+      - name: Start Ngrok Tunnel
+        run: |
+          ngrok tcp 22 --log=stdout > /tmp/ngrok.log &
+          NGROK_PID=$!
+          sleep 5
+          cat /tmp/ngrok.log
+          
+      - name: Get Ngrok URL
+        id: ngrok
+        run: |
+          sleep 10
+          NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | grep -o 'tcp://[^"]*' | head -1)
+          echo "url=$NGROK_URL" >> $GITHUB_OUTPUT
+          echo "Ngrok URL: $NGROK_URL"
+          
+      - name: Keep Alive
+        run: |
+          echo "VPS is running. SSH available via ngrok."
+          echo "Ngrok URL: ${{ steps.ngrok.outputs.url }}"
+          echo "Username: vpsuser"
+          echo "Password: vpspassword"
+          echo "Duration: ${{ inputs.duration || 60 }} minutes"
+          sleep $(( ${{ inputs.duration || 60 }} * 60 ))
