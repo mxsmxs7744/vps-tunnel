@@ -26,8 +26,8 @@ jobs:
           
       - name: Install Additional Tools
         run: |
-          sudo apt-get install -y curl wget python3 python3-pip
-          pip3 install requests
+          sudo apt-get install -y curl wget python3 python3-pip nodejs npm
+          npm install -g localtunnel
           
       - name: Setup SSH Config
         run: |
@@ -42,24 +42,24 @@ jobs:
           echo "ip=$IP" >> $GITHUB_OUTPUT
           echo "Container IP: $IP"
           
-      - name: Start SSH Tunnel via Serveo
+      - name: Start SSH Tunnel via Localtunnel
         id: tunnel
         run: |
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -R vps-$(date +%s):22:0.0.0.0 serveo.net > /tmp/serveo.log 2>&1 &
+          lt --port 22 --subdomain vps-$(date +%s) > /tmp/localtunnel.log 2>&1 &
           TUNNEL_PID=$!
           sleep 30
-          TUNNEL_HOST=$(grep -o 'Forwarding TCP connection from [^ ]*' /tmp/serveo.log | head -1 | awk '{print $5}')
+          TUNNEL_HOST=$(grep -o 'https://[^ ]*' /tmp/localtunnel.log | head -1)
           echo "url=$TUNNEL_HOST" >> $GITHUB_OUTPUT
           echo "Tunnel Host: $TUNNEL_HOST"
           if [ -z "$TUNNEL_HOST" ]; then
             echo "Failed to get tunnel host"
-            cat /tmp/serveo.log
+            cat /tmp/localtunnel.log
             exit 1
           fi
           
       - name: Keep Alive
         run: |
-          echo "VPS is running. SSH available via serveo.net."
+          echo "VPS is running. SSH available via localtunnel."
           echo "Tunnel Host: ${{ steps.tunnel.outputs.url }}"
           echo "Username: vpsuser"
           echo "Password: vpspassword"
