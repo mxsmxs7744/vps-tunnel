@@ -1,4 +1,4 @@
-name: LocalXpose Diagnostics
+name: LocalXpose Login Test
 
 on:
   workflow_dispatch:
@@ -13,10 +13,12 @@ jobs:
           wget https://api.localxpose.io/api/v2/downloads/loclx-linux-amd64.deb
           sudo dpkg -i loclx-linux-amd64.deb
 
-      - name: Show Commands
+      - name: Login Test
+        env:
+          LOCALXPOSE_TOKEN: ${{ secrets.LOCALXPOSE_TOKEN }}
         run: |
-          loclx --help
-          echo "=================="
-          loclx account --help
-          echo "=================="
-          loclx account login --help
+          echo "$LOCALXPOSE_TOKEN" | loclx account login
+
+      - name: Check Account Status
+        run: |
+          loclx account status
