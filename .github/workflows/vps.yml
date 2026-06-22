@@ -9,36 +9,69 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - name: Setup SSH
+      - name: Install SSH Server
         run: |
           sudo apt update
-          sudo apt install -y openssh-server
-          sudo service ssh start
-          sudo useradd -m vpsuser
-          echo 'vpsuser:vpspassword' | sudo chpasswd
-          sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
-          sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          sudo apt install -y openssh-server curl jq
+
+          # إنشاء مستخدم جديد
+          sudo useradd -m -s /bin/bash vpsuser || true
+          echo "vpsuser:vpspassword" | sudo chpasswd
+
+          # تفعيل تسجيل الدخول بكلمة المرور
+          sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+
           sudo service ssh restart
 
-      - name: Start ngrok
+      - name: Install ngrok
+        run: |
+          curl -sSL https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz -o ngrok.tgz
+          tar -xzf ngrok.tgz
+          sudo mv ngrok /usr/local/bin/
+          ngrok version
+
+      - name: Verify Secret Exists
         env:
           NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         run: |
-          sudo apt install -y jq curl
-          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc > /dev/null
-          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list > /dev/null
-          sudo apt update
-          sudo apt install -y ngrok
-          ngrok authtoken "$NGROK_AUTH_TOKEN"
-          ngrok tcp 22 --log=stdout &
-          sleep 10
-          echo "NGROK_URL=$(curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url')" >> $GITHUB_ENV
+          echo "Token length: ${#NGROK_AUTH_TOKEN}"
 
-      - name: Display ngrok URL
-        run: |
-          echo "NGROK_URL: $NGROK_URL"
+          if [ -z "$NGROK_AUTH_TOKEN" ]; then
+            echo "❌ NGROK_AUTH_TOKEN is empty!"
+            exit 1
+          fi
 
-      - name: Keep alive
+      - name: Authenticate and Start Tunnel
+        env:
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         run: |
-          echo "VPS is running for 60 minutes"
+          ngrok config add-authtoken "$NGROK_AUTH_TOKEN"
+
+          nohup ngrok tcp 22 > ngrok.log 2>&1 &
+
+          sleep 15
+
+          cat ngrok.log || true
+
+          NGROK_URL=$(curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url')
+
+          if [ "$NGROK_URL" = "null" ] || [ -z "$NGROK_URL" ]; then
+            echo "❌ Failed to obtain ngrok tunnel URL"
+            exit 1
+          fi
+
+          echo "NGROK_URL=$NGROK_URL" >> $GITHUB_ENV
+
+      - name: Show SSH Information
+        run: |
+          echo "===================================="
+          echo "SSH Host: $NGROK_URL"
+          echo "Username : vpsuser"
+          echo "Password : vpspassword"
+          echo "===================================="
+
+      - name: Keep VPS Alive
+        run: |
+          echo "VPS will stay alive for 60 minutes..."
           sleep 3600
