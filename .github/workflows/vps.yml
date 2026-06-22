@@ -1,4 +1,4 @@
-name: VPS Tunnel with ngrok
+name: VPS Tunnel with Cloudflare
 
 on:
   workflow_dispatch:
@@ -12,66 +12,28 @@ jobs:
       - name: Install SSH Server
         run: |
           sudo apt update
-          sudo apt install -y openssh-server curl jq
+          sudo apt install -y openssh-server curl
 
-          # إنشاء مستخدم جديد
           sudo useradd -m -s /bin/bash vpsuser || true
           echo "vpsuser:vpspassword" | sudo chpasswd
 
-          # تفعيل تسجيل الدخول بكلمة المرور
           sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
-          sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
-
           sudo service ssh restart
 
-      - name: Install ngrok
+      - name: Install Cloudflared
         run: |
-          curl -sSL https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz -o ngrok.tgz
-          tar -xzf ngrok.tgz
-          sudo mv ngrok /usr/local/bin/
-          ngrok version
+          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared-linux-amd64.deb
 
-      - name: Verify Secret Exists
-        env:
-          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+      - name: Start Tunnel
         run: |
-          echo "Token length: ${#NGROK_AUTH_TOKEN}"
+          nohup cloudflared tunnel --url tcp://localhost:22 > tunnel.log 2>&1 &
 
-          if [ -z "$NGROK_AUTH_TOKEN" ]; then
-            echo "❌ NGROK_AUTH_TOKEN is empty!"
-            exit 1
-          fi
+          sleep 20
 
-      - name: Authenticate and Start Tunnel
-        env:
-          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
-        run: |
-          ngrok config add-authtoken "$NGROK_AUTH_TOKEN"
-
-          nohup ngrok tcp 22 > ngrok.log 2>&1 &
-
-          sleep 15
-
-          cat ngrok.log || true
-
-          NGROK_URL=$(curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url')
-
-          if [ "$NGROK_URL" = "null" ] || [ -z "$NGROK_URL" ]; then
-            echo "❌ Failed to obtain ngrok tunnel URL"
-            exit 1
-          fi
-
-          echo "NGROK_URL=$NGROK_URL" >> $GITHUB_ENV
-
-      - name: Show SSH Information
-        run: |
-          echo "===================================="
-          echo "SSH Host: $NGROK_URL"
-          echo "Username : vpsuser"
-          echo "Password : vpspassword"
-          echo "===================================="
+          cat tunnel.log
 
       - name: Keep VPS Alive
         run: |
-          echo "VPS will stay alive for 60 minutes..."
+          echo "VPS running for 60 minutes..."
           sleep 3600
