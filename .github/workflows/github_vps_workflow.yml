@@ -1,67 +1,38 @@
-name: Temporary VPS with SSH Server
+name: VPS Tunnel with Serveo
 
 on:
   workflow_dispatch:
-    inputs:
-      duration:
-        description: 'Duration in minutes'
-        required: true
-        default: '60'
 
 jobs:
   vps:
     runs-on: ubuntu-latest
     timeout-minutes: 360
-    
+
     steps:
-      - name: Install SSH Server
+      - name: Setup SSH
         run: |
-          sudo apt-get update
-          sudo apt-get install -y openssh-server
-          sudo service ssh start
-          sudo useradd -m -s /bin/bash vpsuser
-          echo 'vpsuser:vpspassword' | sudo chpasswd
-          sudo usermod -aG sudo vpsuser
-          echo "vpsuser ALL=(ALL) NOPASSWD:ALL" | sudo tee -a /etc/sudoers
-          
-      - name: Install Additional Tools
-        run: |
-          sudo apt-get install -y curl wget python3 python3-pip nodejs npm
-          npm install -g localtunnel
-          
-      - name: Setup SSH Config
-        run: |
-          sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
-          sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          sudo apt update
+          sudo apt install -y openssh-server curl
+
+          sudo useradd -m -s /bin/bash vpsuser || true
+          echo "vpsuser:vpspassword" | sudo chpasswd
+
+          sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
           sudo service ssh restart
-          
-      - name: Get Container IP
-        id: ip
+
+      - name: Create Serveo Tunnel
         run: |
-          IP=$(hostname -I | awk '{print $1}')
-          echo "ip=$IP" >> $GITHUB_OUTPUT
-          echo "Container IP: $IP"
-          
-      - name: Start SSH Tunnel via Localtunnel
-        id: tunnel
+          ssh -o StrictHostKeyChecking=no \
+              -o ServerAliveInterval=60 \
+              -R 0:localhost:22 serveo.net > tunnel.log 2>&1 &
+
+          echo "انتظار إنشاء النفق..."
+          sleep 15
+
+          echo "===== محتوى السجل ====="
+          cat tunnel.log
+
+      - name: Keep VPS Alive
         run: |
-          lt --port 22 --subdomain vps-$(date +%s) > /tmp/localtunnel.log 2>&1 &
-          TUNNEL_PID=$!
-          sleep 30
-          TUNNEL_HOST=$(grep -o 'https://[^ ]*' /tmp/localtunnel.log | head -1)
-          echo "url=$TUNNEL_HOST" >> $GITHUB_OUTPUT
-          echo "Tunnel Host: $TUNNEL_HOST"
-          if [ -z "$TUNNEL_HOST" ]; then
-            echo "Failed to get tunnel host"
-            cat /tmp/localtunnel.log
-            exit 1
-          fi
-          
-      - name: Keep Alive
-        run: |
-          echo "VPS is running. SSH available via localtunnel."
-          echo "Tunnel Host: ${{ steps.tunnel.outputs.url }}"
-          echo "Username: vpsuser"
-          echo "Password: vpspassword"
-          echo "Duration: ${{ inputs.duration || 60 }} minutes"
-          sleep $(( ${{ inputs.duration || 60 }} * 60 ))
+          echo "VPS is running..."
+          sleep 21600
