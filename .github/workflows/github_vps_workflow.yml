@@ -1,51 +1,57 @@
 name: VPS Tunnel with LocalXpose
 
 on:
-  workflow_dispatch:
+workflow_dispatch:
 
 jobs:
-  vps:
-    runs-on: ubuntu-latest
+vps:
+runs-on: ubuntu-latest
 
-    steps:
+steps:
+  - name: Install packages
+    run: |
+      sudo apt update
+      sudo apt install -y openssh-server wget
 
-    - name: Install packages
-      run: |
-        sudo apt update
-        sudo apt install -y openssh-server wget
+  - name: Configure SSH
+    run: |
+      sudo useradd -m vpsuser || true
+      echo "vpsuser:vpspassword" | sudo chpasswd
+      sudo usermod -aG sudo vpsuser
 
-    - name: Configure SSH
-      run: |
-        sudo useradd -m vpsuser || true
-        echo "vpsuser:vpspassword" | sudo chpasswd
-        sudo usermod -aG sudo vpsuser
+      sudo sed -i 's/^#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+      sudo sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
 
-        sudo sed -i 's/^#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
-        sudo sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+      sudo service ssh restart
 
-        sudo service ssh restart
+  - name: Install LocalXpose
+    run: |
+      wget https://api.localxpose.io/api/v2/downloads/loclx-linux-amd64.deb
+      sudo dpkg -i loclx-linux-amd64.deb
 
-    - name: Install LocalXpose
-      run: |
-        wget https://api.localxpose.io/api/v2/downloads/loclx-linux-amd64.deb
-        sudo dpkg -i loclx-linux-amd64.deb
+  - name: Login to LocalXpose
+    env:
+      LOCALXPOSE_TOKEN: ${{ secrets.LOCALXPOSE_TOKEN }}
+    run: |
+      echo "$LOCALXPOSE_TOKEN" | loclx account login || true
 
-    - name: Create config
-      run: |
-        mkdir -p ~/.localxpose
-        echo "${{ secrets.LOCALXPOSE_TOKEN }}" > ~/.localxpose/access
+  - name: Diagnostics
+    run: |
+      loclx version || true
+      loclx account status || true
+      loclx account login --help || true
 
-    - name: Start Tunnel
-      run: |
-        nohup loclx tunnel tcp --to localhost:22 > tunnel.log 2>&1 &
+  - name: Start Tunnel
+    run: |
+      nohup loclx tunnel tcp --to localhost:22 > tunnel.log 2>&1 &
 
-        echo "انتظار إنشاء النفق..."
-        sleep 20
+      echo "Waiting for tunnel..."
+      sleep 20
 
-        echo "===== Tunnel Log ====="
-        cat tunnel.log
+      echo "===== Tunnel Log ====="
+      cat tunnel.log
 
-    - name: Keep VPS Alive
-      run: |
-        echo "VPS running for 6 hours..."
-        sleep 21600
+  - name: Keep VPS Alive
+    run: |
+      echo "VPS running..."
+      sleep 21600
