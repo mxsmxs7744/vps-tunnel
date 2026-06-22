@@ -1,4 +1,4 @@
-name: LocalXpose Login Test
+name: LocalXpose Access File Test
 
 on:
   workflow_dispatch:
@@ -13,12 +13,17 @@ jobs:
           wget https://api.localxpose.io/api/v2/downloads/loclx-linux-amd64.deb
           sudo dpkg -i loclx-linux-amd64.deb
 
-      - name: Login Test
+      - name: Create Access File
         env:
           LOCALXPOSE_TOKEN: ${{ secrets.LOCALXPOSE_TOKEN }}
         run: |
-          echo "$LOCALXPOSE_TOKEN" | loclx account login
+          mkdir -p ~/.localxpose
+          echo "$LOCALXPOSE_TOKEN" > ~/.localxpose/access
 
-      - name: Check Account Status
+      - name: Check Status
         run: |
           loclx account status
+
+      - name: Tunnel Test
+        run: |
+          timeout 20s loclx tunnel tcp --to localhost:22 || true
