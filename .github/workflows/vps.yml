@@ -1,4 +1,4 @@
-name: VPS Tunnel with Cloudflare
+name: VPS Tunnel with Pinggy
 
 on:
   workflow_dispatch:
@@ -14,35 +14,22 @@ jobs:
           sudo apt update
           sudo apt install -y openssh-server curl
 
-          # إنشاء المستخدم
           sudo useradd -m -s /bin/bash vpsuser || true
           echo "vpsuser:vpspassword" | sudo chpasswd
 
-          # تفعيل تسجيل الدخول بكلمة المرور
           sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
 
-          # إعادة تشغيل SSH
           sudo service ssh restart
 
-      - name: Install Cloudflared
+      - name: Start Pinggy Tunnel
         run: |
-          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-          sudo dpkg -i cloudflared-linux-amd64.deb
-
-      - name: Start Tunnel
-        run: |
-          nohup cloudflared tunnel --url tcp://localhost:22 > tunnel.log 2>&1 &
-
-          echo "انتظار إنشاء النفق..."
-          sleep 30
-
-          echo "===== محتوى السجل ====="
+          ssh -o StrictHostKeyChecking=no -p 443 -R0:localhost:22 tcp@free.pinggy.io > tunnel.log 2>&1 &
+          sleep 10
+          echo "===== Tunnel URL ====="
+          cat tunnel.log | grep -o 'https://[^ ]*\.pinggy\.io' || echo "لم يتم العثور على الرابط، تحقق من السجل الكامل:"
           cat tunnel.log
-
-          echo "===== العمليات الجارية ====="
-          ps aux | grep cloudflared
 
       - name: Keep VPS Alive
         run: |
-          echo "VPS running for 60 minutes..."
+          echo "VPS is running for 60 minutes..."
           sleep 3600
