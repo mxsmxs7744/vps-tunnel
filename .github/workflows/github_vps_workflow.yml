@@ -18,13 +18,13 @@ jobs:
           echo "vpsuser:vpspassword" | sudo chpasswd
 
           sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
-          sudo service ssh restart
+          sudo systemctl restart ssh
 
       - name: Create Serveo Tunnel
         run: |
           ssh -o StrictHostKeyChecking=no \
               -o ServerAliveInterval=60 \
-              -R 0:localhost:22 serveo.net > tunnel.log 2>&1 &
+              -R 2222:localhost:22 serveo.net > tunnel.log 2>&1 &
 
           echo "انتظار إنشاء النفق..."
           sleep 15
@@ -32,7 +32,15 @@ jobs:
           echo "===== محتوى السجل ====="
           cat tunnel.log
 
+          echo ""
+          echo "======================================"
+          echo "إذا نجح النفق فجرّب الاتصال من جهازك بالأمر:"
+          echo "ssh -p 2222 vpsuser@serveo.net"
+          echo "اسم المستخدم: vpsuser"
+          echo "كلمة المرور: vpspassword"
+          echo "======================================"
+
       - name: Keep VPS Alive
         run: |
-          echo "VPS is running..."
+          echo "VPS is running for 6 hours..."
           sleep 21600
