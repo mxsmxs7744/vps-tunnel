@@ -1,26 +1,26 @@
 name: LocalXpose Test
 
 on:
-workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
-test:
-runs-on: ubuntu-latest
+  test:
+    runs-on: ubuntu-latest
 
-steps:
-  - name: Install LocalXpose
-    run: |
-      wget https://api.localxpose.io/api/v2/downloads/loclx-linux-amd64.deb
-      sudo dpkg -i loclx-linux-amd64.deb
+    steps:
+      - name: Install LocalXpose
+        run: |
+          wget https://api.localxpose.io/api/v2/downloads/loclx-linux-amd64.deb
+          sudo dpkg -i loclx-linux-amd64.deb
 
-  - name: Check Version
-    run: |
-      loclx --version
+      - name: Check Version
+        run: |
+          loclx --version
 
-  - name: Show Login Help
-    run: |
-      loclx account login --help
+      - name: Show Login Help
+        run: |
+          loclx account login --help
 
-  - name: Show Account Help
-    run: |
-      loclx account --help
+      - name: Show Account Help
+        run: |
+          loclx account --help
