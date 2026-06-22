@@ -1,0 +1,40 @@
+name: VPS Tunnel with ngrok
+
+on:
+  workflow_dispatch:
+
+jobs:
+  vps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    steps:
+      - name: Setup SSH
+        run: |
+          sudo apt update
+          sudo apt install -y openssh-server
+          sudo service ssh start
+          sudo useradd -m vpsuser
+          echo 'vpsuser:vpspassword' | sudo chpasswd
+          sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+          sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          sudo service ssh restart
+
+      - name: Start ngrok
+        run: |
+          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+          sudo apt update && sudo apt install ngrok
+          ngrok config add-authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
+          ngrok tcp 22 --log=stdout &
+          sleep 5
+          echo "NGROK_URL=$(curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url')" >> $GITHUB_ENV
+
+      - name: Display ngrok URL
+        run: |
+          echo "NGROK_URL: ${{ env.NGROK_URL }}"
+
+      - name: Keep alive
+        run: |
+          echo "VPS is running for 60 minutes"
+          sleep 3600
