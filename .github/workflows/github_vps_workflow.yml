@@ -1,4 +1,4 @@
-name: LocalXpose Test
+name: VPS Tunnel
 
 on:
   workflow_dispatch:
@@ -13,14 +13,17 @@ jobs:
           wget https://api.localxpose.io/api/v2/downloads/loclx-linux-amd64.deb
           sudo dpkg -i loclx-linux-amd64.deb
 
-      - name: Check Version
+      - name: Login
+        env:
+          LOCALXPOSE_TOKEN: ${{ secrets.LOCALXPOSE_TOKEN }}
         run: |
-          loclx --version
+          mkdir -p ~/.localxpose
+          echo "$LOCALXPOSE_TOKEN" > ~/.localxpose/access
 
-      - name: Show Login Help
+      - name: Check Status
         run: |
-          loclx account login --help
+          cat ~/.localxpose/access | wc -c
 
-      - name: Show Account Help
+      - name: Test Tunnel
         run: |
-          loclx account --help
+          timeout 20s loclx tunnel tcp --to localhost:22 || true
