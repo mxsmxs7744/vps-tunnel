@@ -1,4 +1,4 @@
-name: VPS Tunnel with Serveo
+name: VPS Tunnel with LocalXpose
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ jobs:
       - name: Setup SSH
         run: |
           sudo apt update
-          sudo apt install -y openssh-server curl
+          sudo apt install -y openssh-server curl wget
 
           sudo useradd -m -s /bin/bash vpsuser || true
           echo "vpsuser:vpspassword" | sudo chpasswd
@@ -20,25 +20,26 @@ jobs:
           sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
           sudo systemctl restart ssh
 
-      - name: Create Serveo Tunnel
+      - name: Install LocalXpose
         run: |
-          ssh -o StrictHostKeyChecking=no \
-              -o ServerAliveInterval=60 \
-              -R 2222:localhost:22 serveo.net > tunnel.log 2>&1 &
+          wget https://api.localxpose.io/api/v2/downloads/loclx-linux-amd64.deb
+          sudo dpkg -i loclx-linux-amd64.deb
+
+      - name: Login to LocalXpose
+        env:
+          LOCALXPOSE_TOKEN: ${{ secrets.LOCALXPOSE_TOKEN }}
+        run: |
+          loclx account login --token $LOCALXPOSE_TOKEN
+
+      - name: Create TCP Tunnel
+        run: |
+          nohup loclx tunnel tcp --to localhost:22 > tunnel.log 2>&1 &
 
           echo "انتظار إنشاء النفق..."
-          sleep 15
+          sleep 20
 
           echo "===== محتوى السجل ====="
           cat tunnel.log
-
-          echo ""
-          echo "======================================"
-          echo "إذا نجح النفق فجرّب الاتصال من جهازك بالأمر:"
-          echo "ssh -p 2222 vpsuser@serveo.net"
-          echo "اسم المستخدم: vpsuser"
-          echo "كلمة المرور: vpspassword"
-          echo "======================================"
 
       - name: Keep VPS Alive
         run: |
