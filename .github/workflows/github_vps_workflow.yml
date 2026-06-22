@@ -1,4 +1,4 @@
-name: VPS Tunnel
+name: LocalXpose Test
 
 on:
   workflow_dispatch:
@@ -17,13 +17,12 @@ jobs:
         env:
           LOCALXPOSE_TOKEN: ${{ secrets.LOCALXPOSE_TOKEN }}
         run: |
-          mkdir -p ~/.localxpose
-          echo "$LOCALXPOSE_TOKEN" > ~/.localxpose/access
+          printf "%s\n" "$LOCALXPOSE_TOKEN" | loclx account login
 
       - name: Check Status
         run: |
-          cat ~/.localxpose/access | wc -c
+          loclx account status
 
-      - name: Test Tunnel
+      - name: Tunnel Test
         run: |
           timeout 20s loclx tunnel tcp --to localhost:22 || true
