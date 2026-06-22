@@ -1,4 +1,4 @@
-name: Test Workflow
+name: VPS Test
 
 on:
   workflow_dispatch:
@@ -8,5 +8,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Test
-        run: echo "Hello"
+      - name: Show LocalXpose Version
+        run: |
+          wget https://api.localxpose.io/api/v2/downloads/loclx-linux-amd64.deb
+          sudo dpkg -i loclx-linux-amd64.deb
+
+          loclx version
+
+      - name: Show Help
+        run: |
+          loclx account --help || true
+          loclx account login --help || true
