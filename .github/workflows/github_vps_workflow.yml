@@ -1,4 +1,4 @@
-name: VPS Test
+name: LocalXpose Diagnostics
 
 on:
   workflow_dispatch:
@@ -8,14 +8,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Show LocalXpose Version
+      - name: Install LocalXpose
         run: |
           wget https://api.localxpose.io/api/v2/downloads/loclx-linux-amd64.deb
           sudo dpkg -i loclx-linux-amd64.deb
 
-          loclx version
-
-      - name: Show Help
+      - name: Show Commands
         run: |
-          loclx account --help || true
-          loclx account login --help || true
+          loclx --help
+          echo "=================="
+          loclx account --help
+          echo "=================="
+          loclx account login --help
