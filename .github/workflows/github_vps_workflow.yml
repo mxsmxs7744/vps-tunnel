@@ -1,4 +1,4 @@
-name: VPS Tunnel with Pagekite
+name: VPS Tunnel with Telebit
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ jobs:
       - name: Install SSH Server
         run: |
           sudo apt update
-          sudo apt install -y openssh-server curl python3
+          sudo apt install -y openssh-server curl
 
           sudo useradd -m -s /bin/bash vpsuser || true
           echo "vpsuser:vpspassword" | sudo chpasswd
@@ -21,17 +21,15 @@ jobs:
 
           sudo service ssh restart
 
-      - name: Install Pagekite
+      - name: Install Telebit
         run: |
-          curl -s https://pagekite.net/pk/pagekite.py > pagekite.py
-          chmod +x pagekite.py
+          curl -s https://get.telebit.io/ | bash
 
-      - name: Start Pagekite Tunnel
+      - name: Start Telebit Tunnel
         run: |
-          python3 pagekite.py --clean --frontend=pagekite.net:22 22:fasl-vps.pagekite.me:22 > tunnel.log 2>&1 &
+          telebit ssh 22 > tunnel.log 2>&1 &
           sleep 10
           echo "===== Tunnel URL ====="
-          echo "fasl-vps.pagekite.me:22"
           cat tunnel.log
 
       - name: Keep VPS Alive
