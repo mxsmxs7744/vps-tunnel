@@ -1,28 +1,35 @@
-name: LocalXpose Test
+name: VPS Tunnel with Pinggy
 
 on:
   workflow_dispatch:
 
 jobs:
-  test:
+  vps:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     steps:
-      - name: Install LocalXpose
+      - name: Install SSH Server
         run: |
-          wget https://api.localxpose.io/api/v2/downloads/loclx-linux-amd64.deb
-          sudo dpkg -i loclx-linux-amd64.deb
+          sudo apt update
+          sudo apt install -y openssh-server curl
 
-      - name: Login
-        env:
-          LOCALXPOSE_TOKEN: ${{ secrets.LOCALXPOSE_TOKEN }}
-        run: |
-          printf "%s\n" "$LOCALXPOSE_TOKEN" | loclx account login
+          sudo useradd -m -s /bin/bash vpsuser || true
+          echo "vpsuser:vpspassword" | sudo chpasswd
 
-      - name: Check Status
-        run: |
-          loclx account status
+          sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
 
-      - name: Tunnel Test
+          sudo service ssh restart
+
+      - name: Start Pinggy Tunnel
         run: |
-          timeout 20s loclx tunnel tcp --to localhost:22 || true
+          ssh -o StrictHostKeyChecking=no -p 443 -R0:localhost:22 tcp@free.pinggy.io > tunnel.log 2>&1 &
+          sleep 10
+          echo "===== Tunnel URL ====="
+          cat tunnel.log | grep -o 'tcp://[^ ]*\.pinggy-free\.link:[0-9]*' || echo "لم يتم العثور على الرابط، تحقق من السجل الكامل:"
+          cat tunnel.log
+
+      - name: Keep VPS Alive
+        run: |
+          echo "VPS running for 60 minutes..."
+          sleep 3600
