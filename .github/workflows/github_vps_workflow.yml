@@ -1,4 +1,4 @@
-name: VPS Tunnel with Pinggy
+name: VPS Tunnel with Pagekite
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ jobs:
       - name: Install SSH Server
         run: |
           sudo apt update
-          sudo apt install -y openssh-server curl
+          sudo apt install -y openssh-server curl python3
 
           sudo useradd -m -s /bin/bash vpsuser || true
           echo "vpsuser:vpspassword" | sudo chpasswd
@@ -21,12 +21,17 @@ jobs:
 
           sudo service ssh restart
 
-      - name: Start Pinggy Tunnel
+      - name: Install Pagekite
         run: |
-          ssh -o StrictHostKeyChecking=no -p 443 -R0:localhost:22 tcp@free.pinggy.io > tunnel.log 2>&1 &
+          curl -s https://pagekite.net/pk/pagekite.py > pagekite.py
+          chmod +x pagekite.py
+
+      - name: Start Pagekite Tunnel
+        run: |
+          python3 pagekite.py --clean --frontend=pagekite.net:22 22:fasl-vps.pagekite.me:22 > tunnel.log 2>&1 &
           sleep 10
           echo "===== Tunnel URL ====="
-          cat tunnel.log | grep -o 'tcp://[^ ]*\.pinggy-free\.link:[0-9]*' || echo "لم يتم العثور على الرابط، تحقق من السجل الكامل:"
+          echo "fasl-vps.pagekite.me:22"
           cat tunnel.log
 
       - name: Keep VPS Alive
